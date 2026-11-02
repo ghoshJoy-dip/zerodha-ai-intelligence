@@ -1,0 +1,11 @@
+{
+  "user_123": {
+    "portfolio_id": "p_001",
+    "risk_profile": "moderate",
+    "holdings": [
+      {"symbol": "TCS", "sector": "IT", "quantity": 15, "average_buy_price": 3800.00},
+      {"symbol": "RELIANCE", "sector": "Energy", "quantity": 25, "average_buy_price": 2800.00},
+      {"symbol": "HDFCBANK", "sector": "Banking", "quantity": 50, "average_buy_price": 1600.00}
+    ]
+  }
+}
