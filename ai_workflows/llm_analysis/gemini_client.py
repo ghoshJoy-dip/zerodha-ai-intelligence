@@ -11,7 +11,9 @@ from dotenv import load_dotenv
 project_root = Path(__file__).resolve().parent.parent.parent
 sys.path.append(str(project_root))
 
+# All custom imports MUST go below the sys.path.append
 from ai_workflows.context_builder.builder import build_financial_context
+from ai_workflows.prompt_templates.insight_prompt import build_insight_prompt
 
 # Load environment variables
 load_dotenv()
@@ -35,15 +37,7 @@ def generate_financial_insight(context_data: dict, max_retries: int = 3) -> dict
     with open(schema_path, "r") as f:
         insight_schema = json.load(f)
 
-    prompt = f"""
-    You are an expert financial AI for the Zerodha Intelligence Platform. 
-    Analyze the following portfolio, live market data, and recent news.
-    Provide a structured financial insight based strictly on the data provided. Do not hallucinate external numbers.
-    Focus on risk, diversification, or recent news impacts.
-    
-    Data Context:
-    {json.dumps(context_data, indent=2)}
-    """
+    prompt = build_insight_prompt(context_data)
 
     current_model = primary_model
 
