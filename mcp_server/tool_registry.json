@@ -1,0 +1,48 @@
+{
+  "server_version": "1.0.0",
+  "tools": [
+    {
+      "name": "fetch_portfolio",
+      "description": "Fetches current portfolio holdings, average buy prices, and asset allocations for a given user.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string",
+            "description": "The unique identifier for the user."
+          }
+        },
+        "required": ["user_id"]
+      }
+    },
+    {
+      "name": "fetch_market_data",
+      "description": "Fetches real-time stock prices, indices, and market breadth.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "tickers": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "List of stock tickers (e.g., RELIANCE.NS)."
+          }
+        },
+        "required": ["tickers"]
+      }
+    },
+    {
+      "name": "fetch_news",
+      "description": "Fetches recent corporate actions, earnings reports, and sector news.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query for news."
+          }
+        },
+        "required": ["query"]
+      }
+    }
+  ]
+}

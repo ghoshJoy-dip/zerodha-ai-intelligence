@@ -1,10 +1,10 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 
-# These imports will resolve cleanly because Uvicorn runs from the project root
 from ai_workflows.context_builder.builder import build_financial_context
 from ai_workflows.llm_analysis.gemini_client import generate_financial_insight
 from ai_workflows.validation.validator import detect_hallucinations
+from backend.services.queue_service import process_insight_async
 
 app = FastAPI(title="Zerodha AI Intelligence API")
 
@@ -21,7 +21,7 @@ def health_check():
     return {"status": "active", "service": "Zerodha AI Backend"}
 
 @app.get("/api/insight/{user_id}")
-async def get_portfolio_insight(user_id: str):
+async def get_portfolio_insight(user_id: str, background_tasks: BackgroundTasks):
     try:
         # Step 1: Gather live context
         context = await build_financial_context(user_id)
@@ -37,6 +37,9 @@ async def get_portfolio_insight(user_id: str):
         validated_insight = detect_hallucinations(insight, context)
         if "error" in validated_insight:
              raise HTTPException(status_code=422, detail=validated_insight["error"])
+             
+        # Step 4: Dispatch background jobs (DB logging, recommendation triggers)
+        background_tasks.add_task(process_insight_async, user_id, validated_insight)
              
         return validated_insight
         
