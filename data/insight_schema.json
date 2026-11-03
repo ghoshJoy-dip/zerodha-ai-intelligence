@@ -9,14 +9,17 @@
     "explanation": { "type": "string" },
     "rationale": { "type": "string" },
     "supporting_metrics": {
-      "type": "object",
-      "additionalProperties": { "type": "number" }
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "metric_name": { "type": "string" },
+          "metric_value": { "type": "number" }
+        },
+        "required": ["metric_name", "metric_value"]
+      }
     },
-    "confidence": {
-      "type": "number",
-      "minimum": 0.0,
-      "maximum": 1.0
-    },
+    "confidence": { "type": "number" },
     "freshness_timestamp": { "type": "string" },
     "disclaimer": { "type": "string" }
   },
