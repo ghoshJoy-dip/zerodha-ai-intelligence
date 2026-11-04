@@ -12,9 +12,10 @@ def to_yahoo_format(symbol: str) -> str:
     """Appends .NS for Indian stocks on the NSE."""
     return symbol if symbol.startswith("^") else f"{symbol}.NS"
 
-async def fetch_dynamic_market_data(portfolio_symbols: list, period: str = "1y") -> dict:
+async def fetch_dynamic_market_data(portfolio_symbols: list, period: str = "3mo") -> dict:
     """
-    Fetches market data dynamically based ONLY on the user's current holdings.
+    Fetches market data dynamically based on portfolio holdings + benchmark indices.
+    Returns latest prices, 1d change, volume, volatility flags, and historical closing series.
     """
     if not portfolio_symbols:
         return {"status": "error", "message": "No portfolio symbols provided."}
@@ -63,11 +64,16 @@ async def fetch_dynamic_market_data(portfolio_symbols: list, period: str = "1y")
             
             pct_change = ((float(latest['Close']) - float(prev['Close'])) / float(prev['Close'])) * 100
             
+            close_series = [round(float(c), 2) for c in df['Close'].tolist()]
+            daily_returns = [round(float(r), 4) for r in df['Close'].pct_change().dropna().tolist()]
+            
             market_context[clean_symbol] = {
                 "latest_close": round(float(latest['Close']), 2),
                 "1d_change_pct": round(float(pct_change), 2),
-                "volume": int(latest['Volume']),
-                "high_volatility_flag": abs(pct_change) > 10.0 
+                "volume": int(latest['Volume']) if 'Volume' in latest and pd.notna(latest['Volume']) else 0,
+                "high_volatility_flag": abs(pct_change) > 10.0,
+                "history_closes": close_series,
+                "daily_returns": daily_returns
             }
             
         return {
@@ -81,10 +87,9 @@ async def fetch_dynamic_market_data(portfolio_symbols: list, period: str = "1y")
         return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
-    # Test the async function locally
     async def run_test():
         test_symbols = ["TCS", "RELIANCE"]
-        result = await fetch_dynamic_market_data(test_symbols, period="5d")
+        result = await fetch_dynamic_market_data(test_symbols, period="1mo")
         print("Market Data Fetch Result:")
         import json
         print(json.dumps(result, indent=2))

@@ -9,6 +9,7 @@ if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
 
 from ai_workflows.recommendation_engine.engine import generate_actionable_steps
+from backend.database.connection import save_recommendation_cards
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("BackgroundQueue")
@@ -30,6 +31,29 @@ def process_insight_async(user_id: str, insight: dict):
         for rec in recommendations:
             logger.info(f" -> {rec['action']} on {rec.get('ticker', 'UNKNOWN')}: {rec['reason']}")
     else:
-        logger.warning("Insight not validated. Flagging for manual audit.")
+        validation_reason = insight.get("validation_reason") or "Validation failed."
+        confidence = insight.get("confidence")
+        if not isinstance(confidence, (int, float)) or not 0 <= confidence <= 1:
+            confidence = 0.0
+        card = {
+            "category": insight.get("category") or "Summary Follow-up",
+            "title": str(insight.get("title") or "Insight flagged for review")[:255],
+            "rationale": f"Downgraded because validation failed: {validation_reason}",
+            "confidence": confidence,
+            "freshness_ts": datetime.now(timezone.utc),
+            "disclaimer": insight.get("disclaimer") or "This insight failed validation and requires review.",
+            "metrics_json": {
+                "status": "downgraded",
+                "is_validated": False,
+                "validation_reason": validation_reason,
+                "supporting_metrics": insight.get("supporting_metrics", [])
+            }
+        }
+        saved_cards = save_recommendation_cards(None, [card])
+        logger.info(
+            "Persisted downgraded recommendation card for %s (card_id=%s)",
+            user_id,
+            saved_cards[0]["id"]
+        )
         
     logger.info(f"QUEUE JOB COMPLETE: {user_id}")

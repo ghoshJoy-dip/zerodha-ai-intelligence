@@ -1,15 +1,20 @@
 {
-  "server_version": "1.0.0",
+  "server_version": "2.0.0",
   "tools": [
     {
       "name": "fetch_portfolio",
-      "description": "Fetches current portfolio holdings, average buy prices, and asset allocations for a given user.",
+      "description": "Fetches sample, sandbox, or live portfolio holdings for the authenticated user.",
       "parameters": {
         "type": "object",
         "properties": {
           "user_id": {
             "type": "string",
             "description": "The unique identifier for the user."
+          },
+          "source": {
+            "type": "string",
+            "enum": ["sample", "sandbox", "live"],
+            "description": "Portfolio data source."
           }
         },
         "required": ["user_id"]
@@ -17,14 +22,18 @@
     },
     {
       "name": "fetch_market_data",
-      "description": "Fetches real-time stock prices, indices, and market breadth.",
+      "description": "Fetches real-time stock prices, 1-day change, volumes, benchmarks (^NSEI, ^INDIAVIX), and closing history.",
       "parameters": {
         "type": "object",
         "properties": {
           "tickers": {
             "type": "array",
             "items": { "type": "string" },
-            "description": "List of stock tickers (e.g., RELIANCE.NS)."
+            "description": "List of stock symbols (e.g. ['TCS', 'RELIANCE'])."
+          },
+          "period": {
+            "type": "string",
+            "description": "Historical duration for returns calculation (default '3mo')."
           }
         },
         "required": ["tickers"]
@@ -32,16 +41,58 @@
     },
     {
       "name": "fetch_news",
-      "description": "Fetches recent corporate actions, earnings reports, and sector news.",
+      "description": "Fetches recent market news, corporate announcements, and regulatory signals for symbols.",
       "parameters": {
         "type": "object",
         "properties": {
-          "query": {
-            "type": "string",
-            "description": "Search query for news."
+          "symbols": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "List of stock symbols to retrieve news for."
+          },
+          "max_articles_per_stock": {
+            "type": "integer",
+            "description": "Number of articles per stock (default 2)."
           }
         },
-        "required": ["query"]
+        "required": ["symbols"]
+      }
+    },
+    {
+      "name": "run_analytics",
+      "description": "Computes deterministic financial analytics: HHI concentration, sector drift, drawdown/volatility, benchmark beta/alpha, and attribution.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "holdings": {
+            "type": "array",
+            "items": { "type": "object" },
+            "description": "List of portfolio holdings objects."
+          },
+          "market_data": {
+            "type": "object",
+            "description": "Dictionary of symbol market quotes and closing histories."
+          }
+        },
+        "required": ["holdings", "market_data"]
+      }
+    },
+    {
+      "name": "score_risk",
+      "description": "Evaluates risk thresholds (HHI > 0.25, drawdown > 15%, volatility > 25%, beta tilt) and returns composite risk score and alert triggers.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "analytics_metrics": {
+            "type": "object",
+            "description": "Pre-computed deterministic analytics payload from run_analytics."
+          },
+          "risk_tolerance": {
+            "type": "string",
+            "description": "User risk tolerance profile: 'conservative', 'moderate', or 'aggressive'."
+          }
+        },
+        "required": ["analytics_metrics"]
       }
     }
   ]
