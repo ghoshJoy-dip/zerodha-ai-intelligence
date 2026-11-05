@@ -15,6 +15,7 @@ from ai_workflows.llm_analysis.gemini_client import generate_financial_insight
 from ai_workflows.validation.validator import detect_hallucinations
 from backend.database.connection import (
     get_audit_trail_for_job,
+    get_feedback_summary_by_job,
     get_job,
     get_recommendation_card_job,
     record_feedback,
@@ -58,11 +59,13 @@ app.add_middleware(
 class PortfolioAnalysisRequest(BaseModel):
     user_id: str | None = Field(default=None, min_length=1)
     source: Literal["sample", "sandbox", "live"] = "sample"
+    timeframe: Literal["1mo", "3mo", "6mo", "1y"] = "3mo"
 
 
 class MarketRefreshRequest(BaseModel):
     user_id: str | None = Field(default=None, min_length=1)
     source: Literal["sample", "sandbox", "live"] = "sample"
+    timeframe: Literal["1mo", "3mo", "6mo", "1y"] = "3mo"
 
 
 class MCPToolRequest(BaseModel):
@@ -122,7 +125,8 @@ def _resolve_request_user(
 
 def _job_source(job: dict) -> str:
     job_type = job.get("job_type") or ""
-    source = job_type.rsplit(":", 1)[-1] if ":" in job_type else "sample"
+    parts = job_type.split(":")
+    source = parts[1] if len(parts) > 1 else "sample"
     return source if source in {"sample", "sandbox", "live"} else "sample"
 
 
@@ -279,7 +283,11 @@ async def create_portfolio_analysis(
     http_request: Request,
 ):
     user_id = _resolve_request_user(http_request, request.source, request.user_id)
-    submission = await submit_portfolio_analysis(user_id, request.source)
+    submission = await submit_portfolio_analysis(
+        user_id,
+        request.source,
+        request.timeframe,
+    )
     background_tasks.add_task(
         process_portfolio_analysis,
         submission["job_id"],
@@ -292,7 +300,11 @@ async def create_portfolio_analysis(
 async def market_refresh(request: MarketRefreshRequest, http_request: Request):
     try:
         user_id = _resolve_request_user(http_request, request.source, request.user_id)
-        return await refresh_market_data(user_id, request.source)
+        return await refresh_market_data(
+            user_id,
+            request.source,
+            request.timeframe,
+        )
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -397,4 +409,28 @@ async def get_job_audit(job_id: str, request: Request):
         raise HTTPException(status_code=404, detail="Job not found.")
     _ensure_job_access(request, job)
     events = await asyncio.to_thread(get_audit_trail_for_job, job_id)
-    return {"job_id": job_id, "events": events}
+    feedback = await asyncio.to_thread(get_feedback_summary_by_job, job_id)
+    timed_events = [
+        float(event["latency_ms"])
+        for event in events
+        if event.get("latency_ms") is not None
+    ]
+    failed_events = sum(1 for event in events if event.get("status") == "error")
+    return {
+        "job_id": job_id,
+        "job": job,
+        "events": events,
+        "operations": {
+            "event_count": len(events),
+            "failed_event_count": failed_events,
+            "failure_rate_pct": (
+                round(failed_events / len(events) * 100, 2) if events else 0
+            ),
+            "average_latency_ms": (
+                round(sum(timed_events) / len(timed_events), 2)
+                if timed_events
+                else None
+            ),
+            "feedback": feedback,
+        },
+    }

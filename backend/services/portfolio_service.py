@@ -21,15 +21,27 @@ logger = logging.getLogger("PortfolioService")
 
 def _source_from_job_type(job_type: str | None) -> str:
     if job_type and ":" in job_type:
-        source = job_type.rsplit(":", 1)[1]
+        source = job_type.split(":")[1]
         if source in {"sample", "sandbox", "live"}:
             return source
     return "sample"
 
 
-async def submit_portfolio_analysis(user_id: str, source: str = "sample") -> dict:
+def _timeframe_from_job_type(job_type: str | None) -> str:
+    if job_type:
+        parts = job_type.split(":")
+        if len(parts) > 2 and parts[2] in {"1mo", "3mo", "6mo", "1y"}:
+            return parts[2]
+    return "3mo"
+
+
+async def submit_portfolio_analysis(
+    user_id: str,
+    source: str = "sample",
+    timeframe: str = "3mo",
+) -> dict:
     job_id = str(uuid.uuid4())
-    job_type = "portfolio_analysis" if source == "sample" else f"portfolio_analysis:{source}"
+    job_type = f"portfolio_analysis:{source}:{timeframe}"
     job = await asyncio.to_thread(create_job, job_id, user_id, job_type)
     await asyncio.to_thread(
         record_audit_event,
@@ -49,7 +61,13 @@ async def generate_insight_for_job(job_id: str) -> dict:
     user_id = str(job["portfolio_id"])
     await asyncio.to_thread(update_job_status, job_id, "mcp_tools")
     source = _source_from_job_type(job.get("job_type"))
-    context = await build_financial_context(user_id, job_id=job_id, source=source)
+    timeframe = _timeframe_from_job_type(job.get("job_type"))
+    context = await build_financial_context(
+        user_id,
+        job_id=job_id,
+        source=source,
+        period=timeframe,
+    )
     if "error" in context:
         raise RuntimeError(context["error"])
     if context.get("status") == "empty_portfolio":
@@ -74,7 +92,15 @@ async def generate_insight_for_job(job_id: str) -> dict:
     await asyncio.to_thread(
         record_audit_event,
         "insight_generation",
-        {"job_id": job_id, "user_id": user_id, "insight_id": result["id"]},
+        {
+            "job_id": job_id,
+            "user_id": user_id,
+            "insight_id": result["id"],
+            "compliance_metadata": result["compliance_metadata"],
+            "validation_result": bool(result["insight"].get("is_validated")),
+            "validation_reason": result["insight"].get("validation_reason"),
+            "data_snapshot": result["context"],
+        },
         "success",
         "Insight generated, validated, and persisted.",
     )

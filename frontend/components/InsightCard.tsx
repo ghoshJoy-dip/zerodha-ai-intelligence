@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle, Info } from 'lucide-react';
+import { CheckCircle, Info } from 'lucide-react';
 
 interface Metric {
   metric_name: string;

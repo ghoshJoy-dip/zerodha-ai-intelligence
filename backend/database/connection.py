@@ -303,6 +303,30 @@ def record_feedback(card_id: int, action: str, note: Optional[str] = None) -> di
     finally:
         conn.close()
 
+
+def get_feedback_summary_by_job(job_id: str) -> dict:
+    conn = get_db_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT f.action, COUNT(*)
+                FROM feedback f
+                JOIN recommendation_cards rc ON rc.id = f.card_id
+                WHERE rc.job_id = %s
+                GROUP BY f.action
+                ORDER BY f.action;
+                """,
+                (job_id,),
+            )
+            counts = {action: count for action, count in cur.fetchall()}
+            return {
+                "total": sum(counts.values()),
+                "by_action": counts,
+            }
+    finally:
+        conn.close()
+
 # -------------------------------------------------------------
 # Audit Logs
 # -------------------------------------------------------------

@@ -8,6 +8,8 @@ from backend.services.embedding_service import (
     search_relevant_past_insights,
 )
 
+PROMPT_VERSION = "insight-prompt-v1"
+
 
 async def generate_validate_and_persist(
     job_id: str,
@@ -34,7 +36,9 @@ async def generate_validate_and_persist(
     ]
 
     generated = await asyncio.to_thread(generate_financial_insight, context)
+    generation_metadata = generated.get("_generation_metadata", {})
     validated = detect_hallucinations(generated, context)
+    validated.pop("_generation_metadata", None)
     validated.setdefault("category", "Summary Follow-up")
     validated.setdefault("title", "Portfolio insight")
     validated.setdefault("explanation", "")
@@ -47,7 +51,14 @@ async def generate_validate_and_persist(
         confidence = 0.0
     validated["confidence"] = float(confidence)
 
-    persisted_payload = {**validated, "context_data": context}
+    persisted_payload = {
+        **validated,
+        "context_data": context,
+        "compliance_metadata": {
+            "prompt_version": PROMPT_VERSION,
+            "model_version": generation_metadata.get("model_version", "unknown"),
+        },
+    }
     insight_id = await asyncio.to_thread(
         save_insight_log,
         job_id,
@@ -69,4 +80,5 @@ async def generate_validate_and_persist(
         "insight": validated,
         "context": context,
         "embedding_stored": embedding_stored,
+        "compliance_metadata": persisted_payload["compliance_metadata"],
     }

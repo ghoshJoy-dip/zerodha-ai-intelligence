@@ -14,7 +14,12 @@ if str(project_root) not in sys.path:
 from backend.services.mcp_service import call_mcp_tool, open_mcp_session
 
 
-async def _build_financial_context(session, user_id: str, source: str = "sample") -> dict:
+async def _build_financial_context(
+    session,
+    user_id: str,
+    source: str = "sample",
+    period: str = "3mo",
+) -> dict:
     portfolio_data = await call_mcp_tool(
         session,
         "fetch_portfolio",
@@ -45,7 +50,7 @@ async def _build_financial_context(session, user_id: str, source: str = "sample"
         }
 
     market_task = call_mcp_tool(
-        session, "fetch_market_data", {"tickers": symbols, "period": "3mo"}
+        session, "fetch_market_data", {"tickers": symbols, "period": period}
     )
     news_task = call_mcp_tool(
         session, "fetch_news", {"symbols": symbols, "max_articles_per_stock": 2}
@@ -72,6 +77,7 @@ async def _build_financial_context(session, user_id: str, source: str = "sample"
             "user_id": user_id,
             "portfolio_id": portfolio_data.get("portfolio_id", "default"),
             "portfolio_source": portfolio_data.get("source", source),
+            "timeframe": period,
             "requested_portfolio_source": portfolio_data.get(
                 "requested_source", source
             ),
@@ -96,12 +102,13 @@ async def build_financial_context(
     user_id: str,
     job_id: str | None = None,
     source: str = "sample",
+    period: str = "3mo",
 ) -> dict:
     """
     Builds context using MCP tools over a stdio connection to a separate server process.
     """
     async with open_mcp_session(job_id) as session:
-        return await _build_financial_context(session, user_id, source)
+        return await _build_financial_context(session, user_id, source, period)
 
 def format_context_for_prompt(context_dict: dict) -> str:
     """Converts the context dictionary into formatted JSON for LLM prompting."""

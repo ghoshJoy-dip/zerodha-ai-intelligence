@@ -25,7 +25,10 @@ def generate_financial_insight(context_data: dict, max_retries: int = 3) -> dict
     """
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
-        return {"error": "GEMINI_API_KEY is missing from the .env file."}
+        return {
+            "error": "GEMINI_API_KEY is missing from the .env file.",
+            "_generation_metadata": {"model_version": "unconfigured"},
+        }
     
     # Load model configuration from .env
     primary_model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
@@ -52,7 +55,9 @@ def generate_financial_insight(context_data: dict, max_retries: int = 3) -> dict
                     temperature=0.1
                 )
             )
-            return json.loads(response.text)
+            result = json.loads(response.text)
+            result["_generation_metadata"] = {"model_version": current_model}
+            return result
         except Exception as e:
             error_msg = str(e)
             if "503" in error_msg or "UNAVAILABLE" in error_msg or "429" in error_msg:
@@ -63,7 +68,10 @@ def generate_financial_insight(context_data: dict, max_retries: int = 3) -> dict
                     current_model = fallback_model 
                     time.sleep(wait_time)
                     continue
-            return {"error": f"LLM Generation failed: {error_msg}"}
+            return {
+                "error": f"LLM Generation failed: {error_msg}",
+                "_generation_metadata": {"model_version": current_model},
+            }
 
 if __name__ == "__main__":
     import asyncio

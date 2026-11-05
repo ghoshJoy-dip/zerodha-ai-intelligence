@@ -4,8 +4,16 @@ from ai_workflows.context_builder.builder import build_financial_context
 from backend.services.mcp_service import execute_mcp_tool
 
 
-async def refresh_market_data(user_id: str, source: str = "sample") -> dict:
-    context = await build_financial_context(user_id, source=source)
+async def refresh_market_data(
+    user_id: str,
+    source: str = "sample",
+    timeframe: str = "3mo",
+) -> dict:
+    context = await build_financial_context(
+        user_id,
+        source=source,
+        period=timeframe,
+    )
     if context.get("status") == "empty_portfolio":
         return {
             **context,
